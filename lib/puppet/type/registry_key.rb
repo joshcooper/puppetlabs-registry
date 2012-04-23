@@ -14,6 +14,6 @@ Puppet::Type.newtype(:registry_key) do
   end
 
   autorequire(:registry_key) do
-    parameter(:path).enum_for(:ascend).select { |p| self[:path] != p }
+    parameter(:path).enum_for(:ascend).select { |p| self[:path] != p } # exclude self
   end
 end
