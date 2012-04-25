@@ -14,9 +14,11 @@ Puppet::Type.type(:registry_value).provide(:registry) do
   def create
     Puppet.info("creating: #{self}")
 
-    valuepath.hkey.open(valuepath.subkey, Win32::Registry::KEY_ALL_ACCESS | valuepath.access) do |reg|
-      ary = to_native(resource[:type], resource[:data])
-      reg.write(valuepath.valuename, ary[0], ary[1])
+    valuepath.with_key_loaded do
+      valuepath.hkey.open(valuepath.subkey, Win32::Registry::KEY_ALL_ACCESS | valuepath.access) do |reg|
+        ary = to_native(resource[:type], resource[:data])
+        reg.write(valuepath.valuename, ary[0], ary[1])
+      end
     end
   end
 
@@ -24,10 +26,12 @@ Puppet::Type.type(:registry_value).provide(:registry) do
     Puppet.info("exists: #{self}")
 
     found = false
-    valuepath.hkey.open(valuepath.subkey, Win32::Registry::KEY_READ | valuepath.access) do |reg|
-      type = [0].pack('L')
-      size = [0].pack('L')
-      found = reg_query_value_ex_a.call(reg.hkey, valuepath.valuename, 0, type, 0, size) == 0
+    valuepath.with_key_loaded do
+      valuepath.hkey.open(valuepath.subkey, Win32::Registry::KEY_READ | valuepath.access) do |reg|
+        type = [0].pack('L')
+        size = [0].pack('L')
+        found = reg_query_value_ex_a.call(reg.hkey, valuepath.valuename, 0, type, 0, size) == 0
+      end
     end
     found
   end
@@ -37,17 +41,21 @@ Puppet::Type.type(:registry_value).provide(:registry) do
 
     Puppet.info("flushing: #{self}")
 
-    valuepath.hkey.open(valuepath.subkey, Win32::Registry::KEY_ALL_ACCESS | valuepath.access) do |reg|
-      ary = to_native(regvalue[:type], regvalue[:data])
-      reg.write(valuepath.valuename, ary[0], ary[1])
+    valuepath.with_key_loaded do
+      valuepath.hkey.open(valuepath.subkey, Win32::Registry::KEY_ALL_ACCESS | valuepath.access) do |reg|
+        ary = to_native(regvalue[:type], regvalue[:data])
+        reg.write(valuepath.valuename, ary[0], ary[1])
+      end
     end
   end
 
   def destroy
     Puppet.info("destroying: #{self}")
 
-    valuepath.hkey.open(valuepath.subkey, Win32::Registry::KEY_ALL_ACCESS | valuepath.access) do |reg|
-      reg.delete_value(valuepath.valuename)
+    valuepath.with_key_loaded do
+      valuepath.hkey.open(valuepath.subkey, Win32::Registry::KEY_ALL_ACCESS | valuepath.access) do |reg|
+        reg.delete_value(valuepath.valuename)
+      end
     end
   end
 
@@ -70,12 +78,14 @@ Puppet::Type.type(:registry_value).provide(:registry) do
   def regvalue
     unless @regvalue
       @regvalue = {}
-      valuepath.hkey.open(valuepath.subkey, Win32::Registry::KEY_ALL_ACCESS | valuepath.access) do |reg|
-        type = [0].pack('L')
-        size = [0].pack('L')
+      valuepath.with_key_loaded do
+        valuepath.hkey.open(valuepath.subkey, Win32::Registry::KEY_ALL_ACCESS | valuepath.access) do |reg|
+          type = [0].pack('L')
+          size = [0].pack('L')
 
-        if reg_query_value_ex_a.call(reg.hkey, valuepath.valuename, 0, type, 0, size) == 0
-          @regvalue[:type], @regvalue[:data] = from_native(reg.read(valuepath.valuename))
+          if reg_query_value_ex_a.call(reg.hkey, valuepath.valuename, 0, type, 0, size) == 0
+            @regvalue[:type], @regvalue[:data] = from_native(reg.read(valuepath.valuename))
+          end
         end
       end
     end

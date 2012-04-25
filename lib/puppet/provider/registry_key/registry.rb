@@ -16,12 +16,16 @@ Puppet::Type.type(:registry_key).provide(:registry) do
 
   def create
     Puppet.debug("create key #{resource[:path]}")
-    keypath.hkey.create(keypath.subkey, Win32::Registry::KEY_ALL_ACCESS | keypath.access) {|reg| true }
+    keypath.with_key_loaded do
+      keypath.hkey.create(keypath.subkey, Win32::Registry::KEY_ALL_ACCESS | keypath.access) {|reg| true }
+    end
   end
 
   def exists?
     Puppet.debug("exists? key #{resource[:path]}")
-    !!keypath.hkey.open(keypath.subkey, Win32::Registry::KEY_READ | keypath.access) {|reg| true } rescue false
+    keypath.with_key_loaded do
+      !!keypath.hkey.open(keypath.subkey, Win32::Registry::KEY_READ | keypath.access) {|reg| true } rescue false
+    end
   end
 
   def destroy
@@ -30,8 +34,10 @@ Puppet::Type.type(:registry_key).provide(:registry) do
     raise "Cannot delete root key: #{resource[:path]}" unless keypath.subkey
     reg_delete_key_ex = Win32API.new('advapi32', 'RegDeleteKeyEx', 'LPLL', 'L')
 
-    if reg_delete_key_ex.call(keypath.hkey.hkey, keypath.subkey, keypath.access, 0) != 0
-      raise "Failed to delete registry key: #{resource[:path]}"
+    keypath.with_key_loaded do
+      if reg_delete_key_ex.call(keypath.hkey.hkey, keypath.subkey, keypath.access, 0) != 0
+        raise "Failed to delete registry key: #{resource[:path]}"
+      end
     end
   end
 

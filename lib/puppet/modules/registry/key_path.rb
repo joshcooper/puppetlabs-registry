@@ -5,11 +5,12 @@ require 'pathname'
 # https://projects.puppetlabs.com/issues/14073 is fixed.
 require Pathname.new(__FILE__).dirname
 require Pathname.new(__FILE__).dirname + 'registry_base'
-
+require Pathname.new(__FILE__).dirname + 'user_profile'
 class Puppet::Modules::Registry::KeyPath < Puppet::Parameter
   include Puppet::Modules::Registry::RegistryBase
+  include Puppet::Modules::Registry::UserProfile
 
-  attr_reader :root, :hkey, :subkey, :access
+  attr_reader :root, :hkey, :subkey, :access, :sid
 
   def munge(path)
     unless captures = /^(32:)?([h|H][^\\]*)((?:\\[^\\]{1,255})*)$/.match(path)
@@ -28,8 +29,9 @@ class Puppet::Modules::Registry::KeyPath < Puppet::Parameter
               :hklm
             when /hkey_classes_root/, /hkcr/
               :hkcr
+            when /hkey_users/, /hku/
+              :hku
             when /hkey_current_user/, /hkcu/,
-              /hkey_users/, /hku/,
               /hkey_current_config/, /hkcc/,
               /hkey_performance_data/,
               /hkey_performance_text/,
@@ -49,6 +51,13 @@ class Puppet::Modules::Registry::KeyPath < Puppet::Parameter
     else
       # Leading backslash is not part of the subkey name
       @subkey.sub!(/^\\(.*)$/, '\1')
+
+      if root == :hku and not @subkey.empty?
+        username = @subkey.split('\\', 2)[0]
+        user = Puppet::Type.type(:user).new(:name => username)
+        @sid = user.provider.uid
+        @subkey = "#{@sid}\\#{@subkey.split('\\', 2)[1]}"
+      end
       canonical = "#{root.to_s}\\#{subkey}"
     end
 
@@ -62,5 +71,11 @@ class Puppet::Modules::Registry::KeyPath < Puppet::Parameter
       p = p[0, idx]
       yield p
     end
+  end
+
+  def with_key_loaded(&block)
+    return yield unless self.hkey == Win32::Registry::HKEY_USERS
+
+    with_user_profile(self.sid, &block)
   end
 end
