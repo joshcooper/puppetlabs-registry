@@ -194,9 +194,7 @@ Puppet::Type.type(:registry_value).provide(:registry) do
     when Win32::Registry::REG_SZ, Win32::Registry::REG_EXPAND_SZ
       bytes = wide_string_to_bytes(data)
     when Win32::Registry::REG_MULTI_SZ
-      bytes = data.map do |s|
-        wide_string_to_bytes(s)
-      end.flat_map { |a| a }
+      bytes = data.map { |s| wide_string_to_bytes(s) }.flat_map { |a| a }
       # requires an additional wide NULL terminator
       bytes << 0 << 0
     when Win32::Registry::REG_BINARY
